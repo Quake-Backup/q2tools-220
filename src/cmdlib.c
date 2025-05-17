@@ -640,7 +640,7 @@ typedef struct
 
 int32_t TryLoadFileFromPak(char *filename, void **bufferptr, char *gd) {
     FILE *f;
-    int32_t n, i, ret_len;
+    int32_t pakn, n, i, ret_len;  
     uint32_t dir_ents;
     void *buffer;
     pakheader_t pak_header;
@@ -655,12 +655,11 @@ int32_t TryLoadFileFromPak(char *filename, void **bufferptr, char *gd) {
     *bufferptr = NULL;
 
     ret_len    = -1;
-
-    for (n = 0;; n++) {
+    for (pakn = 0;; pakn++) { //qb: was n.  Bugfix by Dennis Katsonis 
         if (ret_len != -1)
             break;
 
-        sprintf(file, "%spak%d.pak", gd, n);
+        sprintf(file, "%spak%d.pak", gd, pakn);
 
         f = fopen(file, "rb");
 

@@ -225,9 +225,8 @@ jobs:
       working-directory: instdir
       run: cmake -E tar cfv ../${{ matrix.config.artifact }} --format=7zip .
 
-
-    - name: Upload
-      uses: actions/upload-artifact@v3
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v4.6.0
       with:
         path: ./${{ matrix.config.artifact }}
         name: ${{ matrix.config.artifact }}
