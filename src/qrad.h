@@ -66,6 +66,7 @@ typedef struct
 
 #define MAX_PATCHES             65535
 #define MAX_PATCHES_QBSP        4000000 // qb: extended limit
+#define MAX_LSTYLES    256
 
 #define LMSTEP                  16
 
@@ -146,6 +147,7 @@ void BuildLightmaps(void);
 void BuildFacelights(int32_t facenum);
 
 void FinalLightFace(int32_t facenum);
+void BlendLightmaps(void);
 bool PvsForOrigin(vec3_t org, uint8_t *pvs);
 
 int32_t PointInNodenum(vec3_t point);
@@ -157,6 +159,10 @@ void CreateDirectLights(void);
 
 dleaf_t *RadPointInLeaf(vec3_t point);
 dleaf_tx *RadPointInLeafX(vec3_t point);
+void GatherSampleLight(vec3_t pos, vec3_t normal,
+                       float **styletable, int32_t offset, int32_t mapsize, float lightscale2,
+                       bool *sun_main_once, bool *sun_ambient_once, uint8_t *pvs, int32_t nodenum,
+                       bool have_pvs);
 
 extern dplane_t backplanes[MAX_MAP_PLANES_QBSP];
 extern int32_t fakeplanes; // created planes for origin offset
@@ -177,17 +183,47 @@ extern vec3_t sun_color;
 extern float smoothing_threshold;
 extern float smoothing_value;
 extern float sample_nudge;
-extern int32_t num_smoothing;
 
 extern int32_t refine_amt, refine_setting;
 extern int32_t PointInLeafnum(vec3_t point);
 extern void MakeTnodes(dmodel_t *bm);
 extern void MakePatches(void);
 extern void SubdividePatches(void);
-extern void PairEdges(void);
+extern void BuildSpatialNormals(void);
 extern void CalcTextureReflectivity_Heretic2(void);
 extern void CalcTextureReflectivity(void);
-extern uint8_t *dlightdata_ptr;
-extern uint8_t dlightdata_raw[MAX_MAP_LIGHTING_QBSP];
+extern uint8_t *lightdata_ptr;
+extern uint8_t lightdata_raw[MAX_MAP_LIGHTING_QBSP];
 
 extern float sunradscale;
+extern float blend_amount;
+extern float lg_step[3];
+extern bool lg_debug;
+
+
+//lightgrid
+typedef struct {
+    bool used;
+    int style;
+    vec3_t colors[6];
+    vec3_t undirectional_color;
+} lightgrid_raw_sample_t;
+
+typedef struct {
+    lightgrid_raw_sample_t samples_by_style[4];
+    bool occluded;
+} lightgrid_samples_t;
+
+typedef struct {
+    vec3_t grid_dist;
+    vec3_t grid_mins;
+    int grid_size[3];
+    lightgrid_samples_t *grid_result;
+    uint8_t num_styles;
+} lightgrid_raw_data;
+
+void LightGrid_Process(void);
+void LightNormals_Process(void);
+void DecoupledLM_Process(void);
+void CalcLightgridAtPoint(vec3_t point, lightgrid_samples_t *out);
+void FixPointAndCalcLightgrid(vec3_t point, const vec3_t normal, lightgrid_samples_t *out);

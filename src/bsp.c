@@ -141,10 +141,14 @@ void ProcessBlock_Thread(int32_t blocknum) {
     }
 
     if (!nocsg)
+    {
+        int32_t before = CountBrushList(brushes);
+        qprintf("ProcessBlock: brushes before chop: %i\n", before);
         brushes = ChopBrushes(brushes);
+        qprintf("ProcessBlock: brushes after  chop: %i\n", CountBrushList(brushes));
+    }
 
-    tree                                = BrushBSP(brushes, mins, maxs);
-
+    tree = BrushBSP(brushes, mins, maxs);
     block_nodes[xblock + 5][yblock + 5] = tree->headnode;
 }
 
@@ -158,9 +162,9 @@ void ProcessWorldModel(void) {
     entity_t *e;
     tree_t *tree;
     bool leaked;
-    bool optimize;
+    int32_t optimize;
 
-    e           = &entities[entity_num];
+    e = &entities[entity_num];
 
     brush_start = e->firstbrush;
     brush_end   = brush_start + e->numbrushes;
@@ -187,7 +191,8 @@ void ProcessWorldModel(void) {
     if (block_yh > 3)
         block_yh = 3;
 
-    for (optimize = false; optimize <= true; optimize++) {
+    for (optimize = 0; optimize <= 1; optimize++) {
+        
         qprintf("--------------------------------------------\n");
 
         RunThreadsOnIndividual((block_xh - block_xl + 1) * (block_yh - block_yl + 1),
@@ -357,6 +362,7 @@ void BSP_ProcessArgument(const char * arg) {
 
         ProcessModels();
     }
+    uncacheprintf();
 
     PrintBSPFileSizes();
     printf("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< END bsp >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n\n");

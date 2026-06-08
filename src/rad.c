@@ -33,7 +33,6 @@ patch_t *face_patches[MAX_MAP_FACES_QBSP];
 entity_t *face_entity[MAX_MAP_FACES_QBSP];
 patch_t patches[MAX_PATCHES_QBSP];
 unsigned num_patches;
-int32_t num_smoothing; // qb: number of phong hits
 
 vec3_t radiosity[MAX_PATCHES_QBSP];    // light leaving a patch
 vec3_t illumination[MAX_PATCHES_QBSP]; // light arriving at a patch
@@ -53,7 +52,7 @@ bool dicepatches  = false;
 bool noedgefix    = false;
 int32_t memory        = false;
 float patch_cutoff    = 0.0f; // set with -radmin 0.0..1.0, see MakeTransfers()
-
+float blend_amount = 1.0f; //qb: looks great, 100% on by default
 float subdiv          = 64;
 bool dumppatches;
 
@@ -790,27 +789,28 @@ void RadWorld(void) {
     BuildFaceExtents(); // qb: from quetoo
     // create directlights out of patches and lights
     CreateDirectLights();
-    PairEdges(); // qb: moved here for phong
+    BuildSpatialNormals(); // qb: here for phong
 
     // build initial facelights
     RunThreadsOnIndividual(numfaces, true, BuildFacelights);
 
     if (numbounce > 0) {
+        int32_t saved_numthreads = numthreads;
+
         // build transfer lists
         if (!memory) {
             RunThreadsOnIndividual(num_patches, true, MakeTransfers);
             qprintf("transfer lists: %5.1f megs\n", (float)total_transfer * sizeof(transfer_t) / (1024 * 1024));
         }
-        numthreads = 1;
 
-        // spread light around
+        numthreads = 1;
         BounceLight();
+        numthreads = saved_numthreads;
 
         FreeTransfers();
 
         CheckPatches();
-    } else
-        numthreads = 1;
+    }
 
     if (memory) {
         printf("Non-memory conservation would require %4.1f\n",
@@ -849,7 +849,7 @@ void RAD_ProcessArgument(const char *arg) {
     sprintf(name, "%s%s", inbase, source);
     printf("reading %s\n", name);
     LoadBSPFile(name);
-    dlightdata_ptr = dlightdata;
+    lightdata_ptr = lightdata;
     if (use_qbsp) {
         maxdata = MAX_MAP_LIGHTING_QBSP;
     }
@@ -875,16 +875,21 @@ void RAD_ProcessArgument(const char *arg) {
     printf("bounce      : %d\n", numbounce);
     printf("radmin      : %f\n", patch_cutoff);
     printf("subdiv      : %f\n", subdiv);
+    printf("grid spacing: %g %g %g\n", lg_step[0], lg_step[1], lg_step[2]);
     printf("smooth angle: %f\n", smoothing_value);
     printf("nudge       : %f\n", sample_nudge);
     printf("threads     : %d\n", numthreads);
 
     RadWorld();
 
-    if (smoothing_threshold > 0.0) {
-        printf("Smoothing edges found: %i\n\n", num_smoothing);
-    }
+    // postprocess: smooth final lightmaps to reduce hard seams
+    BlendLightmaps();
 
+    if (use_qbsp) {
+        LightGrid_Process();
+        LightNormals_Process();
+        DecoupledLM_Process();
+    }
     sprintf(name, "%s%s", outbase, source);
     printf("writing %s\n", name);
     WriteBSPFile(name);
@@ -892,6 +897,7 @@ void RAD_ProcessArgument(const char *arg) {
     end = I_FloatTime();
     printf("%5.0f seconds elapsed\n", end - start);
     printf("%i bytes light data used of %i max.\n", lightdatasize, maxdata);
+    uncacheprintf();
 
     PrintBSPFileSizes();
     printf("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< END rad >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n\n\n\n");
